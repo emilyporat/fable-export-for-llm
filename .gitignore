@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Project specific
+raw_data/
+outputs/
+.pytest_cache/
+dist/
+build/
+*.egg-info/

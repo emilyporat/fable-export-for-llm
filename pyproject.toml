@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fable-to-goodreads"
+version = "2.0.0"
+authors = [
+  { name="Joel DeBolt" },
+]
+description = "Modern CLI tool to export Fable.co libraries to Goodreads/StoryGraph"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "httpx>=0.24.0",
+    "pydantic>=2.0.0",
+    "rich>=13.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+fable-export = "fable_to_goodreads.cli:main"
