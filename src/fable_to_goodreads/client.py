@@ -46,9 +46,12 @@ class FableClient:
                 
                 results = data.get("results", [])
                 for r in results:
-                    book_id = r.get("book", {}).get("id")
-                    if book_id:
-                        reviews[book_id] = r
+                    if isinstance(r, dict):
+                        book_data = r.get("book", {})
+                        if isinstance(book_data, dict):
+                            book_id = book_data.get("id")
+                            if book_id:
+                                reviews[book_id] = r
                 
                 if not results or len(results) < 50:
                     break
@@ -83,23 +86,39 @@ class FableClient:
                 offset += 100
         return books
 
-    def parse_book(self, item: Dict[str, Any], reviews: Dict[str, Any]) -> Book:
+    def parse_book(self, item: Dict[str, Any], reviews: Dict[str, Any]) -> Optional[Book]:
+        if not item or not isinstance(item, dict):
+            return None
+            
         raw_book = item.get("book", item)
+        if not raw_book or not isinstance(raw_book, dict):
+            return None
+            
         book_id = raw_book.get("id")
+        if not book_id:
+            return None
+
         review = reviews.get(book_id, {})
+        if not isinstance(review, dict):
+            review = {}
         
         # Series
         series_sets = raw_book.get("bookseries_set", [])
         series = None
-        if series_sets:
+        if series_sets and isinstance(series_sets, list):
             s = series_sets[0]
-            series = SeriesInfo(
-                name=s.get("book_series", {}).get("name", ""),
-                position=str(s.get("position", ""))
-            )
+            if isinstance(s, dict):
+                series_obj = s.get("book_series", {})
+                series = SeriesInfo(
+                    name=series_obj.get("name", "") if isinstance(series_obj, dict) else "",
+                    position=str(s.get("position", ""))
+                )
             
         # Ratings
         calc = raw_book.get("calculated_fields", {})
+        if not isinstance(calc, dict):
+            calc = {}
+
         comm_ratings = CommunityRatings(
             average=raw_book.get("review_average"),
             characters=calc.get("characters_rating_average"),
@@ -109,7 +128,7 @@ class FableClient:
         )
         
         # ISBN
-        isbn = raw_book.get("isbn", "")
+        isbn = raw_book.get("isbn", "") or ""
         isbn10 = isbn if len(isbn) == 10 else ""
         isbn13 = isbn if len(isbn) == 13 else ""
         
@@ -121,11 +140,38 @@ class FableClient:
         if status.lower() in ["finished", "read"] and not finished_at:
             finished_at = review.get("created_at") or review.get("updated_at") or ""
 
+        # Authors
+        raw_authors = raw_book.get("authors", [])
+        authors = []
+        if isinstance(raw_authors, list):
+            for a in raw_authors:
+                if isinstance(a, dict):
+                    name = a.get("name")
+                    if name: authors.append(name)
+                elif isinstance(a, str):
+                    authors.append(a)
+
+        # Tags
+        storygraph_tags = raw_book.get("storygraph_tags", {})
+        if not isinstance(storygraph_tags, dict):
+            storygraph_tags = {}
+        
+        moods = storygraph_tags.get("moods")
+        if not isinstance(moods, list): moods = []
+        
+        cw = storygraph_tags.get("content_warnings")
+        if not isinstance(cw, list): cw = []
+
+        # Tropes
+        tropes = raw_book.get("tropes")
+        if not isinstance(tropes, list):
+            tropes = []
+
         return Book(
             id=book_id,
-            title=raw_book.get("title", ""),
+            title=raw_book.get("title", "Unknown"),
             subtitle=raw_book.get("subtitle", ""),
-            authors=[a.get("name") for a in raw_book.get("authors", [])],
+            authors=authors,
             isbn10=isbn10,
             isbn13=isbn13,
             publisher=raw_book.get("imprint") or raw_book.get("publisher") or "",
@@ -133,10 +179,10 @@ class FableClient:
             published_date=raw_book.get("published_date"),
             description=raw_book.get("description"),
             cover_image=raw_book.get("cover_image"),
-            genres=[g.get("name") for g in raw_book.get("genres", [])],
-            moods=raw_book.get("storygraph_tags", {}).get("moods", []),
-            content_warnings=raw_book.get("storygraph_tags", {}).get("content_warnings", []),
-            tropes=raw_book.get("tropes", []),
+            genres=[g.get("name") for g in raw_book.get("genres", []) if isinstance(g, dict) and g.get("name")],
+            moods=moods,
+            content_warnings=cw,
+            tropes=tropes,
             series=series,
             status=status,
             my_rating=review.get("rating"),

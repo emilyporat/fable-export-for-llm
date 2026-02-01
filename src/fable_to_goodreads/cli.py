@@ -15,12 +15,10 @@ console = Console()
 
 def print_header():
     console.print(Panel.fit(
-        "[bold magenta]Fable to Goodreads[/bold magenta]
-"
-        "[italic]Free your library from the Fable ecosystem[/italic]
+        """[bold magenta]Fable to Goodreads[/bold magenta]
+[italic]Free your library from the Fable ecosystem[/italic]
 
-"
-        "Created by [bold blue]Joel DeBolt[/bold blue]",
+Created by [bold blue]Joel DeBolt[/bold blue]""",
         border_style="magenta"
     ))
 
@@ -36,10 +34,7 @@ async def run_export():
         auth_token = Prompt.ask("Enter your FABLE_AUTH_TOKEN (JWT)")
         
         with open(".env", "a") as f:
-            f.write(f"
-FABLE_USER_ID={user_id}
-FABLE_AUTH_TOKEN={auth_token}
-")
+            f.write(f"\nFABLE_USER_ID={user_id}\nFABLE_AUTH_TOKEN={auth_token}\n")
 
     client = FableClient(user_id, auth_token)
     exporter = Exporter()
@@ -77,7 +72,7 @@ FABLE_AUTH_TOKEN={auth_token}
         seen_ids = set()
         for item in all_raw_items:
             book = client.parse_book(item, reviews)
-            if book.id not in seen_ids:
+            if book and book.id not in seen_ids:
                 books.append(book)
                 seen_ids.add(book.id)
             progress.advance(task4)
@@ -93,13 +88,11 @@ FABLE_AUTH_TOKEN={auth_token}
         master_path = exporter.to_master_csv(books)
         progress.advance(task5)
 
-    console.print("
-[bold green]Done![/bold green]")
+    console.print("\n[bold green]Done![/bold green]")
     console.print(f"• Master JSON: [blue]{json_path}[/blue]")
     console.print(f"• Goodreads CSV: [blue]{gr_path}[/blue]")
     console.print(f"• Master CSV: [blue]{master_path}[/blue]")
-    console.print("
-[italic]Raw responses saved in ./raw_data for auditing.[/italic]")
+    console.print("\n[italic]Raw responses saved in ./raw_data for auditing.[/italic]")
 
 def main():
     print_header()
