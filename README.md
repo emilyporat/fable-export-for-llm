@@ -36,6 +36,8 @@ fable-export
 
 On first run, it will ask for your **User ID** and **Auth Token**. You can find these by inspecting Fable's web traffic in your browser's Developer Tools (Network tab).
 
+_NOTE from Emily: the JWT was too long to paste into the CLI input, so I just changed it to always read from an env file._
+
 ### Extraction Instructions:
 1. Login to `fable.co`
 2. Open **DevTools (F12)** -> **Network**
