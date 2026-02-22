@@ -22,22 +22,26 @@ Created by [bold blue]Joel DeBolt[/bold blue]""",
         border_style="magenta"
     ))
 
+ENV_FILE = Path.home() / ".fable_export_env"
+
 async def run_export():
-    load_dotenv()
-    
+    load_dotenv(ENV_FILE)
+
     user_id = os.getenv("FABLE_USER_ID")
     auth_token = os.getenv("FABLE_AUTH_TOKEN")
-    
+
     if not user_id or not auth_token:
-        console.print("[yellow]Credentials missing in .env![/yellow]")
         user_id = Prompt.ask("Enter your FABLE_USER_ID")
-        auth_token = Prompt.ask("Enter your FABLE_AUTH_TOKEN (JWT)")
-        
-        with open(".env", "a") as f:
+        auth_token = Prompt.ask("Enter your FABLE_AUTH_TOKEN")
+
+        with open(ENV_FILE, "a") as f:
             f.write(f"\nFABLE_USER_ID={user_id}\nFABLE_AUTH_TOKEN={auth_token}\n")
+        console.print(f"[dim]Credentials saved to {ENV_FILE}[/dim]")
 
     client = FableClient(user_id, auth_token)
     exporter = Exporter()
+
+    console.print(f"\n[dim]Connecting to Fable API as user [bold]{user_id}[/bold]...[/dim]")
 
     with Progress(
         SpinnerColumn(),
@@ -46,16 +50,24 @@ async def run_export():
         TaskProgressColumn(),
         console=console
     ) as progress:
-        
+
         # Step 1: Reviews
         task1 = progress.add_task("[cyan]Fetching reviews and ratings...", total=None)
-        reviews = await client.fetch_reviews()
-        progress.update(task1, completed=100, description=f"[green]Fetched {len(reviews)} reviews")
+        try:
+            reviews = await client.fetch_reviews()
+        except Exception as e:
+            progress.stop()
+            raise RuntimeError(f"Failed to fetch reviews: {e}") from e
+        progress.update(task1, completed=100, total=100, description=f"[green]Fetched {len(reviews)} reviews")
 
         # Step 2: Lists
         task2 = progress.add_task("[cyan]Fetching book lists...", total=None)
-        lists = await client.fetch_lists()
-        progress.update(task2, completed=100, description=f"[green]Found {len(lists)} lists")
+        try:
+            lists = await client.fetch_lists()
+        except Exception as e:
+            progress.stop()
+            raise RuntimeError(f"Failed to fetch book lists: {e}") from e
+        progress.update(task2, completed=100, total=100, description=f"[green]Found {len(lists)} lists")
 
         # Step 3: Books
         all_raw_items = []
@@ -78,20 +90,24 @@ async def run_export():
             progress.advance(task4)
 
         # Step 5: Export
-        task5 = progress.add_task("[cyan]Exporting files...", total=3)
+        task5 = progress.add_task("[cyan]Exporting files...", total=4)
         json_path = exporter.to_json(books)
         progress.advance(task5)
-        
+
         gr_path = exporter.to_goodreads_csv(books)
         progress.advance(task5)
-        
+
         master_path = exporter.to_master_csv(books)
+        progress.advance(task5)
+
+        recs_path = exporter.to_recommendations_jsonl(books)
         progress.advance(task5)
 
     console.print("\n[bold green]Done![/bold green]")
     console.print(f"• Master JSON: [blue]{json_path}[/blue]")
     console.print(f"• Goodreads CSV: [blue]{gr_path}[/blue]")
     console.print(f"• Master CSV: [blue]{master_path}[/blue]")
+    console.print(f"• Recommendations JSONL: [blue]{recs_path}[/blue]")
     console.print("\n[italic]Raw responses saved in ./raw_data for auditing.[/italic]")
 
 def main():
@@ -99,7 +115,10 @@ def main():
     try:
         asyncio.run(run_export())
     except Exception as e:
+        cause = e.__cause__ or e
         console.print(f"[bold red]Error:[/bold red] {e}")
+        if cause is not e:
+            console.print(f"[red]Caused by:[/red] {cause}")
         sys.exit(1)
 
 if __name__ == "__main__":
