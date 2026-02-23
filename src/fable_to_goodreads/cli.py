@@ -8,6 +8,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
+from .auth import fetch_credentials_via_browser
 from .client import FableClient
 from .exporter import Exporter
 
@@ -30,18 +31,26 @@ async def run_export():
     user_id = os.getenv("FABLE_USER_ID")
     auth_token = os.getenv("FABLE_AUTH_TOKEN")
 
-    if not user_id or not auth_token:
-        user_id = Prompt.ask("Enter your FABLE_USER_ID")
-        auth_token = Prompt.ask("Enter your FABLE_AUTH_TOKEN")
+    email = os.getenv("FABLE_EMAIL")
+    password = os.getenv("FABLE_PASSWORD")
 
-        with open(ENV_FILE, "a") as f:
-            f.write(f"\nFABLE_USER_ID={user_id}\nFABLE_AUTH_TOKEN={auth_token}\n")
-        console.print(f"[dim]Credentials saved to {ENV_FILE}[/dim]")
+    if not email or not password:
+        console.print("[yellow]Enter your Fable login credentials (saved once to ~/.fable_export_env):[/yellow]")
+        email = Prompt.ask("Email")
+        password = Prompt.ask("Password", password=True)
+        with open(ENV_FILE, "w") as f:
+            f.write(f"FABLE_EMAIL={email}\nFABLE_PASSWORD={password}\n")
+        console.print(f"[dim]Saved to {ENV_FILE}[/dim]")
+
+    console.print("\n[dim]Logging into Fable...[/dim]")
+    try:
+        user_id, auth_token = await fetch_credentials_via_browser(email, password)
+    except Exception as e:
+        raise RuntimeError(f"Browser login failed: {e}") from e
+    console.print(f"[dim]Authenticated as user [bold]{user_id}[/bold][/dim]")
 
     client = FableClient(user_id, auth_token)
     exporter = Exporter()
-
-    console.print(f"\n[dim]Connecting to Fable API as user [bold]{user_id}[/bold]...[/dim]")
 
     with Progress(
         SpinnerColumn(),
